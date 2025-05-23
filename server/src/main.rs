@@ -1,3 +1,18 @@
+/**
+ * Carapaca Server (main.rs)
+ * 
+ * This module implements the main server component of the Carapaca secure shell system.
+ * It provides a HTTP server that handles secure communication between clients and the shell server,
+ * implementing various cryptographic protocols including RSA, ECC, and AES for:
+ * - User authentication via digital signatures
+ * - Secure command execution via encrypted channels
+ * - Session key management
+ * - Nonce-based challenge-response verification
+ * 
+ * The server verifies user permissions before allowing shell access and provides
+ * multiple endpoint routes for different security protocols and encryption methods.
+ */
+
 use aes_gcm::{Aes256Gcm, Nonce}; // AES-GCM types
 use aes_gcm::aead::{self}; // Import aead and its traits
 use aes_gcm::aead::generic_array::GenericArray;
@@ -27,6 +42,14 @@ use ciphering::aes::hmac_verify;
 use ciphering::aes::hmac_sign;
 use ciphering::aes::derive_keys_from_session_key_and_iv;
 
+/**
+ * Represents a user in the Carapaca system with their identifiers and cryptographic keys.
+ * 
+ * @field uid: Unique identifier for the user
+ * @field pk_rsa: User's RSA public key in PEM format (base64-encoded)
+ * @field pk_ecc: User's ECC public key in PEM format (base64-encoded)
+ * @field ip: IP address of the user's device
+ */
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct User {
     pub uid: String,
@@ -35,6 +58,14 @@ pub struct User {
     pub ip: String,
 }
 
+/**
+ * Represents an encrypted message with a user identifier.
+ * Used for sending encrypted session keys with authentication.
+ * 
+ * @field uid: Unique identifier of the user sending the cipher
+ * @field c: Encrypted session key (base64-encoded)
+ * @field t: Digital signature of the encrypted key (base64-encoded)
+ */
 #[derive(Serialize, Deserialize)]
 struct CipherWithUid{
     uid: String,
@@ -42,13 +73,26 @@ struct CipherWithUid{
     t: String, // Signature (base64)
 }
 
+/**
+ * Standard response structure for API endpoints.
+ * 
+ * @field message: Response message content
+ * @field status: Status of the response ("success" or "error")
+ */
 #[derive(Serialize, Deserialize)]
 struct ResponseData {
     message: String,
     status: String,
 }
 
-
+/**
+ * Response structure received from the authentication server.
+ * Contains user verification data and challenge nonce response.
+ * 
+ * @field nonce: Challenge nonce response value
+ * @field signature: Digital signature verifying the server's response
+ * @field user: User information structure
+ */
 #[derive(Serialize, Deserialize)]
 struct ServerResponse {
     nonce: String,
@@ -56,15 +100,29 @@ struct ServerResponse {
     user: UserInfo,
 }
 
+/**
+ * Detailed user information structure.
+ * Contains user identification and cryptographic keys.
+ * 
+ * @field uid: Unique identifier for the user
+ * @field pk_rsa: User's RSA public key (base64-encoded PEM)
+ * @field pk_ecc: User's ECC public key (base64-encoded PEM) 
+ * @field ip: IP address of the user's device
+ */
 #[derive(Serialize, Deserialize)]
 struct UserInfo {
     uid: String,
     pk_rsa: String,
     pk_ecc: String,
     ip: String,
-
 }
 
+/**
+ * Basic cipher structure for encrypted messages.
+ * 
+ * @field c: Encrypted data content (base64-encoded)
+ * @field t: Digital signature of the data (base64-encoded)
+ */
 #[derive(Deserialize, Serialize, Debug)]
 struct Cipher {
     c: String,
@@ -72,6 +130,15 @@ struct Cipher {
 }
 
 
+/**
+ * Reads the list of permitted user IDs from a file.
+ * 
+ * This function loads a text file containing a list of authorized user IDs,
+ * one per line, and returns them as a vector of strings.
+ * 
+ * @param file_path - Path to the file containing permitted user IDs
+ * @return Vector of permitted user IDs as strings
+ */
 fn read_permitted_users(file_path: &str) -> Vec<String> {
     fs::read_to_string(file_path)
         .unwrap_or_else(|_| String::new())
@@ -80,6 +147,15 @@ fn read_permitted_users(file_path: &str) -> Vec<String> {
         .collect()
 }
 
+/**
+ * Generates a cryptographically secure random nonce.
+ * 
+ * Creates a 12-byte (96-bit) random value suitable for use as a nonce
+ * in AES-GCM encryption or challenge-response authentication protocols.
+ * The nonce is base64-encoded before being returned.
+ * 
+ * @return Base64-encoded string representation of the generated nonce
+ */
 fn generate_nonce() -> String {
     let mut rng = rand::thread_rng();
     let mut nonce_bytes = [0u8; 12];
@@ -89,31 +165,49 @@ fn generate_nonce() -> String {
     general_purpose::STANDARD.encode(nonce)
 }
 
+/**
+ * Handles the /get-nonce endpoint for generating authentication challenges.
+ * 
+ * This function processes requests for authentication nonces, which are used
+ * in the challenge-response authentication protocol. It validates the user ID (uid),
+ * ensures the user is permitted to access the system, and then:
+ * 1. Generates a cryptographic nonce
+ * 2. Saves the nonce to a file for later verification
+ * 3. Checks if the user's public keys are already stored
+ * 4. If not, it queries an external authentication server to get the user's public keys
+ *
+ * @param req - The HTTP request object containing the user's query parameters
+ * @return HTTP response with a nonce (on success) or an error message
+ */
 async fn handle_get_nonce(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    // Extract the user ID from the query parameters
     let query = req.uri().query().unwrap_or_default();
     let uid = form_urlencoded::parse(query.as_bytes())
         .find(|(key, _)| key == "uid")
         .map(|(_, value)| value.to_string())
         .unwrap_or_default();
 
+    // Validate that UID is provided
     if uid.is_empty() {
         return json_response("UID is missing", "error", 400);
     }
 
+    // Load the list of permitted users from the configuration file
     let permitted_users = read_permitted_users("../data/permitted_users.txt");
     println!("Permitted users: {:?}", permitted_users);
     println!("UID: {:?}", uid);
 
-
+    // Check if the user is permitted to access the system
     if permitted_users.contains(&uid) {
-        // Generate the nonce
+        // Generate a cryptographic nonce for the challenge
         let nonce = generate_nonce();
 
-        // Save the nonce in a file
+        // Save the nonce to a file for later verification during authentication
         let file_path = format!("../data/nonces/{}.txt", uid);
         let mut file = fs::File::create(file_path).expect("Failed to create nonce file");
         writeln!(file, "{}", nonce).expect("Failed to write nonce to file");
 
+        // Define paths for the user's public key files
         let key_path_rsa = format!("../data/keys/clients/{}_rsa.pem", uid);
         let key_path_ecc = format!("../data/keys/clients/{}_ecc.pem", uid);
 

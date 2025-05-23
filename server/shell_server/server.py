@@ -1,40 +1,88 @@
+"""
+Shell Execution Server
+
+This server provides a secure interface for executing shell commands via HTTP.
+It maintains isolated shell sessions for each user and handles command execution
+and output capture securely.
+
+The server is a backend component for the Carapaca secure shell system, receiving
+commands from the main Rust server which handles the cryptographic operations.
+"""
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
-import pty
-import select
-import signal
+import pty           # For creating pseudo terminals
+import select        # For I/O multiplexing
+import signal        # For process control
 import logging
 import time
 
-# ⚙️ Configuração do logger
+# Configure logging for server operations
 logging.basicConfig(
     filename='server.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# Dictionary to store active shell sessions (user_id -> (pid, file_descriptor))
 shells = {}
 
 def start_shell(uid):
+    """
+    Start a new shell process for a user
+    
+    Creates a pseudo-terminal and spawns a bash shell process,
+    then stores the process ID and file descriptor for future use.
+    
+    Args:
+        uid (str): User identifier for the shell session
+    """
     pid, fd = pty.fork()
     if pid == 0:
+        # Child process: replace with bash shell
         os.execvp("bash", ["bash"])
     else:
+        # Parent process: store the shell info
         shells[uid] = (pid, fd)
 
 def stop_shell(uid):
+    """
+    Stop a user's shell process
+    
+    Terminates the shell process and cleans up resources.
+    
+    Args:
+        uid (str): User identifier for the shell session
+    """
     if uid in shells:
         pid, fd = shells.pop(uid)
-        os.kill(pid, signal.SIGKILL)
-        os.close(fd)
+        os.kill(pid, signal.SIGKILL)  # Forcefully terminate the process
+        os.close(fd)                  # Close the file descriptor
 
 def send_command(uid, cmd):
+    """
+    Send a command to a user's shell and capture the output
+    
+    Creates a shell if one doesn't exist for the user, sends the command,
+    and captures the output with appropriate formatting.
+    
+    Args:
+        uid (str): User identifier for the shell session
+        cmd (str): Command to execute
+        
+    Returns:
+        str: Command output
+    """
+    # Create a shell if one doesn't exist for this user
     if uid not in shells:
         start_shell(uid)
-        time.sleep(1)  # Give the shell time to start
+        time.sleep(1)  # Allow time for the shell to initialize
 
+    # Get the shell process information
     pid, fd = shells[uid]
+    
+    # Send the command to the shell
     os.write(fd, cmd.encode() + b'\n')
 
     output = b''
