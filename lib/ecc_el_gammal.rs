@@ -1,72 +1,148 @@
-use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
-use aes_gcm::aead::Aead;
-use hkdf::Hkdf;
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
-use rand_core::OsRng;
+/**
+ * Elliptic Curve Cryptography (ECC) Operations Module
+ * 
+ * This module implements ECC-based encryption, decryption, signing, and verification
+ * using both El Gamal encryption and ECDSA signatures. It provides hybrid encryption
+ * combining ECC with AES-GCM for practical message encryption.
+ * 
+ * The implementation uses the k256 crate (NIST P-256/secp256r1 curve) for ECC operations.
+ */
+
+use aes_gcm::{Aes256Gcm, KeyInit, Nonce};                // AES-GCM encryption
+use aes_gcm::aead::Aead;                                 // AEAD interface
+use hkdf::Hkdf;                                          // Key derivation function
+use hmac::{Hmac, Mac};                                   // HMAC authentication
+use sha2::Sha256;                                        // SHA-256 hash function
+use rand_core::OsRng;                                    // Secure random number generator
 use k256::{
-    EncodedPoint, ProjectivePoint, PublicKey, SecretKey,
-    elliptic_curve::sec1::ToEncodedPoint,
-    elliptic_curve::point::AffineCoordinates,
+    EncodedPoint, ProjectivePoint, PublicKey, SecretKey, // ECC key types
+    elliptic_curve::sec1::ToEncodedPoint,                // Point encoding
+    elliptic_curve::point::AffineCoordinates,            // Access to point coordinates
 };
-use hmac::digest::KeyInit as HmacKeyInit;
-use base64::{engine::general_purpose, Engine as _};
-use std::fs::File;
-use std::io::Write;
-use k256::pkcs8::{EncodePrivateKey, EncodePublicKey};
-use std::path::Path;
-use k256::pkcs8::{DecodePrivateKey, DecodePublicKey};
-use std::fs;
+use hmac::digest::KeyInit as HmacKeyInit;                // HMAC initialization
+use base64::{engine::general_purpose, Engine as _};      // Base64 encoding/decoding
+use std::fs::File;                                       // File operations
+use std::io::Write;                                      // Write trait
+use k256::pkcs8::{EncodePrivateKey, EncodePublicKey};    // Key encoding
+use std::path::Path;                                     // Path handling
+use k256::pkcs8::{DecodePrivateKey, DecodePublicKey};    // Key decoding
+use std::fs;                                             // Filesystem operations
 use k256::ecdsa::{
-    signature::{Signer, Verifier}, SigningKey, VerifyingKey, Signature,
+    signature::{Signer, Verifier}, SigningKey, VerifyingKey, Signature, // ECDSA components
 };
 
+// Type alias for HMAC-SHA256
 type HmacSha256 = Hmac<Sha256>;
 
+/**
+ * Generate a new random ECC key pair
+ * 
+ * @return (SecretKey, PublicKey) - A tuple containing the private and public keys
+ */
 pub fn generate_keypair() -> (SecretKey, PublicKey) {
+    // Generate a random private key using secure random number generator
     let sk = SecretKey::random(&mut OsRng);
+    
+    // Derive the corresponding public key
     let pk = sk.public_key();
+    
     (sk, pk)
 }
 
 
+/**
+ * Create a base64-encoded ECDSA signature for a message
+ * 
+ * @param sk - The private key to sign with
+ * @param message - The message bytes to sign
+ * @return String - Base64-encoded DER signature
+ */
 pub fn sign_to_base64(sk: &SecretKey, message: &[u8]) -> String {
+    // Create signing key from the secret key
     let signing_key = SigningKey::from(sk.clone());
+    
+    // Generate the signature
     let signature: Signature = signing_key.sign(message);
+    
+    // Encode the signature in DER format and then as base64
     general_purpose::STANDARD.encode(signature.to_der().as_bytes())
 }
 
+/**
+ * Verify an ECDSA signature against a message
+ * 
+ * @param pk - The public key to verify with
+ * @param message - The message that was signed
+ * @param signature_b64 - Base64-encoded signature to verify
+ * @return bool - True if signature is valid, false otherwise
+ */
 pub fn verify_signature(pk: &PublicKey, message: &[u8], signature_b64: &str) -> bool {
+    // Create verifying key from the public key
     let verifying_key = VerifyingKey::from(pk.clone());
+    
+    // Decode the base64 signature
     let sig_bytes = general_purpose::STANDARD.decode(signature_b64).unwrap();
+    
+    // Parse the DER-encoded signature
     let signature = match Signature::from_der(&sig_bytes) {
         Ok(sig) => sig,
-        Err(_) => return false,
+        Err(_) => return false, // Return false if signature parsing fails
     };
+    
+    // Verify the signature against the message
     verifying_key.verify(message, &signature).is_ok()
 }
 
-/// Guarda a chave privada e pública ECC em ficheiros `.pem`.
+/**
+ * Save an ECC key pair to PEM files
+ * 
+ * Stores the private and public keys in standard PEM format files
+ * for interoperability with other cryptographic tools.
+ * 
+ * @param sk - The private key to save
+ * @param pk - The public key to save
+ * @param priv_path - Path to store the private key
+ * @param pub_path - Path to store the public key
+ * @return Result<(), Box<dyn std::error::Error>> - Success or error result
+ */
 pub fn save_keypair_to_pem(sk: &SecretKey, pk: &PublicKey, priv_path: &str, pub_path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // Codificar chave privada em PKCS#8 PEM
+    // Encode private key in PKCS#8 PEM format
     let private_pem = sk.to_pkcs8_pem(Default::default())?;
     let mut priv_file = File::create(priv_path)?;
     priv_file.write_all(private_pem.as_bytes())?;
 
-    // Codificar chave pública em PEM (SEC1)
+    // Encode public key in PEM format (SEC1)
     let public_pem = pk.to_public_key_pem(Default::default())?;
     let mut pub_file = File::create(pub_path)?;
     pub_file.write_all(public_pem.as_bytes())?;
     Ok(())
 }
 
+/**
+ * Load a private key from a PEM file
+ * 
+ * @param path - Path to the PEM file containing the private key
+ * @return SecretKey - The loaded private key
+ */
 pub fn load_private_key_from_pem(path: String) -> SecretKey {
+    // Read PEM file content
     let pem = fs::read_to_string(Path::new(&path)).unwrap();
+    
+    // Parse the private key from PKCS#8 PEM format
     SecretKey::from_pkcs8_pem(&pem).unwrap()
 }
 
+/**
+ * Load a public key from a PEM file
+ * 
+ * @param path - Path to the PEM file containing the public key
+ * @return PublicKey - The loaded public key
+ */
 pub fn load_public_key_from_pem(path: String) -> PublicKey {
+    // Read PEM file content
     let pem = fs::read_to_string(Path::new(&path)).unwrap();
+    
+    // Parse the public key from PEM format
     PublicKey::from_public_key_pem(&pem).unwrap()
 }
 
