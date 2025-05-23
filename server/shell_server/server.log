@@ -1,0 +1,35 @@
+2025-05-20 05:31:05,023 - INFO - Servidor iniciado.
+2025-05-20 05:33:07,344 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:36:10,028 - INFO - UID=Pobedinsky | CMD='clear'
+2025-05-20 05:36:17,026 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:36:20,732 - INFO - UID=Pobedinsky | CMD='exit'
+2025-05-20 05:43:57,588 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:47:19,781 - INFO - UID=Pobedinsky | CMD='exit'
+2025-05-20 05:47:31,119 - INFO - Servidor iniciado.
+2025-05-20 05:48:13,387 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:48:36,751 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:48:41,501 - INFO - UID=Pobedinsky | CMD='exit'
+2025-05-20 05:51:02,302 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:51:08,102 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:51:27,822 - INFO - Servidor iniciado.
+2025-05-20 05:51:43,007 - INFO - Servidor iniciado.
+2025-05-20 05:52:13,345 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:52:13,347 - ERROR - Erro do cliente Pobedinsky: module 'os' has no attribute 'flush'
+2025-05-20 05:52:23,163 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:52:23,165 - ERROR - Erro do cliente Pobedinsky: module 'os' has no attribute 'flush'
+2025-05-20 05:52:36,430 - INFO - UID=Pobedinsky | CMD='exit'
+2025-05-20 05:53:41,283 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:53:41,285 - ERROR - Erro do cliente Pobedinsky: module 'os' has no attribute 'flush'
+2025-05-20 05:53:49,546 - INFO - Servidor iniciado.
+2025-05-20 05:53:53,566 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:54:03,241 - INFO - UID=Pobedinsky | CMD='exit'
+2025-05-20 05:54:39,026 - INFO - UID=Pobedinsky | CMD='ls'
+2025-05-20 05:59:00,842 - INFO - Servidor iniciado.
+2025-05-20 05:59:11,396 - INFO - UID=Pobedinsky | CMD='exit'
+2025-05-20 06:03:40,197 - INFO - UID=Teste | CMD='ls'
+2025-05-20 06:04:33,013 - INFO - Servidor iniciado.
+2025-05-20 06:04:34,548 - INFO - UID=Teste | CMD='exit'
+2025-05-20 06:04:46,761 - INFO - UID=Teste | CMD='ls'
+2025-05-20 06:04:49,773 - INFO - UID=Teste | CMD='exit'
+2025-05-20 06:12:00,874 - INFO - Servidor iniciado.
+2025-05-20 06:12:22,624 - INFO - UID=Teste | CMD='ls'
