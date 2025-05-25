@@ -5,14 +5,24 @@ This is a Portuguese 🇵🇹 SSH, designed for secure remote shell access betwe
 
 ---
 
-## Architecture
+## 🧱 Architecture
 
-The project is composed of three main components: server, client and Trusting Agent. If the server's and client's functions are obvious, the Trusting Agent will allow the public keys exchange between client-server.
-The system implements:
-- RSA for exchange of a session key
-- ECIES for safe encrypt and decrypt
-- Preloaded symmetric keys
-- Digital Signature for authentication server-client
+The project is composed of three main components:
+
+- **Client** – Initiates a secure connection request and handles local encryption/decryption tasks.
+- **Server** – Responds to connection requests, manages authentication, and establishes a secure session.
+- **Trusting Agent** – A mediator responsible for securely exchanging public keys between the client and server, ensuring both parties can trust each other before communication begins.
+
+---
+
+### 🔐 Cryptographic Components
+
+The system implements a layered security model using multiple cryptographic techniques:
+
+- **RSA** – Used for the exchange of a symmetric session key between client and server.
+- **ECIES (Elliptic Curve Integrated Encryption Scheme)** – Ensures confidentiality during data encryption and decryption processes.
+- **Preloaded Symmetric Keys** – Shared keys are distributed securely in advance and used for fast symmetric encryption.
+- **Digital Signatures** – Provides mutual authentication between client and server to prevent impersonation and ensure data integrity.
 
 ---
 
